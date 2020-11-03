@@ -1,8 +1,8 @@
 import os, nltk, json
 
-# Derive 1-, 2-, and 3-grams (2- and 3-grams include start and end char) from token.
+# Derive 2-, and 3-grams (including start and end char) from token.
 def trigramize(orgstr):
-    ans = [l for l in orgstr]
+    ans = []
     altstr = ' ' + orgstr + ' '
     for i in range(1, len(altstr)-1):
         ans.append(altstr[i-1:i+1])
