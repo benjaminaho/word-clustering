@@ -37,4 +37,4 @@ for word in word_idxs:
 
 # Write words sorted by score to file.
 word_scores = [y[0] for y in sorted(word_scores.items(), key=lambda x: x[1], reverse=True)]
-json.dump(word_scores, open("lsi/results/" + target + ".json", "w"))
+json.dump(word_scores, open("search_results/lsi" + target + ".json", "w"))

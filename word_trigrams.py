@@ -12,20 +12,22 @@ def trigramize(orgstr):
 
 pattern = r'''(?x) (?:[A-Z]\.)+ | \w+(?:-\w+)* | \$?\d+(?:\.\d+)?%?'''
 
-# Create dictionary of token : list of trigrams pairs.
+# Create dictionary of token : list of trigrams pairs and its inverse.
 
 dictionary = dict()
+dictionary_inv = dict()
 
 for textfn in os.listdir(os.getcwd() + "/texts"):
     with open("texts/" + textfn, "r") as textf:
         for token in nltk.regexp_tokenize(textf.read().lower(), pattern):
             if token not in dictionary:
                 dictionary[token] = trigramize(token)
+                for gram in [g for g in dictionary[token] if len(g) > 1]:
+                    if gram not in dictionary_inv:
+                        dictionary_inv[gram] = [token]
+                    else:
+                        dictionary_inv[gram].append(token)
 
-# Save dictionary to file.
+# Save dictionaries to file.
 json.dump(dictionary, open("dictionary.json", "w"))
-
-
-#print(dictionary["london"])
-#print(dictionary["a"])
-#print(dictionary["ask"])
+json.dump(dictionary_inv, open("dictionary_inverse.json", "w"))
