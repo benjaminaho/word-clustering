@@ -19,10 +19,10 @@ dictionary_inv = dict()
 
 for textfn in os.listdir(os.getcwd() + "/texts"):
     with open("texts/" + textfn, "r") as textf:
-        for token in nltk.regexp_tokenize(textf.read().lower(), pattern):
+        for token in nltk.regexp_tokenize(textf.read().replace("-", " ").lower(), pattern):
             if token not in dictionary:
                 dictionary[token] = trigramize(token)
-                for gram in [g for g in dictionary[token] if len(g) > 1]:
+                for gram in dictionary[token]:#[g for g in dictionary[token] if len(g) > 1]:
                     if gram not in dictionary_inv:
                         dictionary_inv[gram] = [token]
                     else:

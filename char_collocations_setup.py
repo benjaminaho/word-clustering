@@ -1,3 +1,12 @@
+"""
+Create dictionary of gram : [[a gram which follows gram in a word, number of words in which this gram follows gram] for each gram which follows gram] key-value pairs.
+
+This program effectively finds all 3-, 4-, 5-, and 6-grams in the corpus, indexed by their primary
+bigram in the former two, and their primary trigram in the latter. Each pair (bigram-monogram,
+bigram-bigram, trigram-bigram, or trigram-trigram) is a possible "collocation," which is determined
+in a subsequent program.
+"""
+
 import json
 
 word_index = json.load(open("dictionary.json", "r"))
