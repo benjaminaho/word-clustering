@@ -1,82 +1,131 @@
-"""For every gram+letter or letter+gram in the corpus, determine the log likelihood ratio of the observations under the hypotheses of independence between occurences of gram and letter and of dependence.
+"""
 """
 
 import json, math
 
 gram_cnts = json.load(open("gram_cnts.json", "r"))
-lett_cnts_by_gram_lens = json.load(open("num_gram_lens.json", "r"))
 
-alphabet = "abcdefghijklmnopqrstuvwxyz "
+alphabet = set(" abcdefghijklmnopqrstuvwxyz.")
 
-gram_len_cnts = [0 for _ in range(31)] #[sum([gram_cnts[m] for m in alphabet])] 
-for i in range(1, len(gram_len_cnts)):
-    for let in lett_cnts_by_gram_lens[0]:
-        gram_len_cnts[i] += lett_cnts_by_gram_lens[0][let][i-1]
-#json.dump(gram_len_cnts, open("gram_len_cnts.json", "w"))
+def smooth(val):
+    if val == 1:
+        return 0.999999
+    elif val == 0:
+        return 0.000001
+    return val
 
-def log_lam(direction, gram, lett):
-    if (gram_len_cnts[len(gram)] - gram_cnts[gram][direction]) == 0:
-        print(gram + lett)
-        return 0
+def likelihoods(letter, prev="", post=""):
 
-    cnt_lett = lett_cnts_by_gram_lens[direction][lett][len(gram)-1]
-    cnt_gram = gram_cnts[gram][direction]
-    cnt_both = gram_cnts[gram + lett][direction] if direction == 0 else gram_cnts[lett + gram][direction]
+    whole_gram = prev + letter + post
 
-    h0_prob = cnt_lett / gram_len_cnts[len(gram)]
-    h1_prob_t = cnt_both / cnt_gram
-    h1_prob_f = (cnt_lett - cnt_both) / (gram_len_cnts[len(gram)] - cnt_gram)
+    space = sum([gram_cnts[l] for l in alphabet - {" ", "."}])
+    
+    cnt_prev_post = sum([gram_cnts[prev+l+post] for l in alphabet if prev+l+post in gram_cnts])
 
-    # If any of the probability values are 0 or 1, the likelihood ratio will be either 0 or undefined, and its log will be undefined.
-    if not (h0_prob <= 0 or h0_prob >= 1 or h1_prob_t <= 0 or h1_prob_t >= 1 or h1_prob_f <= 0 or h1_prob_f >= 1):
-        
-        # Calculate the log likelihood ratio.
-        # Combinatorial factors in the random variable expressions are nixed.
-        log_lambda = -2 * (
+    h0_prob = gram_cnts[letter] / space
 
-            # numerator: likelihood under the null hypothesis
+    def likelihood(tt_prob, tf_prob, ft_prob, ff_prob):
+        tt_prob = smooth(tt_prob)
+        tf_prob = smooth(tf_prob)
+        ft_prob = smooth(ft_prob)
+        ff_prob = smooth(ff_prob)
+        return -2 * (
 
-            # log of the probability of the "gram comes before"-class of our observations
-            cnt_both * math.log(h0_prob) +
-            (cnt_gram - cnt_both) * math.log(1 - h0_prob) +
+            # log of the probability of the "prev comes before and post comes after"-class of the observations
+            # letter | prev & post
+            gram_cnts[whole_gram] * math.log(tt_prob) +
+            # not letter | prev & post
+            (cnt_prev_post - gram_cnts[whole_gram]) * math.log(1 - tt_prob) +
 
-            # log prob of the "gram does not come before"-class
-            (cnt_lett - cnt_both) * math.log(h0_prob) +
-            (gram_len_cnts[len(gram)] - cnt_lett - cnt_gram + cnt_both) * math.log(1 - h0_prob) -
+            # letter | prev & not post
+            (gram_cnts[prev + letter] - gram_cnts[whole_gram]) * math.log(tf_prob) +
+            # not letter | prev & not post
+            (gram_cnts[prev] - gram_cnts[prev + letter]) * math.log(1 - tf_prob) +
 
-            # denomenator: likelihood under the alternative hypothesis
+            # letter | not prev & post
+            (gram_cnts[letter + post] - gram_cnts[whole_gram]) * math.log(ft_prob) +
+            # not letter | not prev & post
+            (gram_cnts[post] - gram_cnts[letter + post]) * math.log(1 - ft_prob) +
 
-            cnt_both * math.log(h1_prob_t) -
-            (cnt_gram - cnt_both) * math.log(1 - h1_prob_t) -
-
-            (cnt_lett - cnt_both) * math.log(h1_prob_f) -
-            (gram_len_cnts[len(gram)] - cnt_lett - cnt_gram + cnt_both) * math.log(1 - h1_prob_f)
+            # letter | not prev & not post
+            (gram_cnts[letter] - gram_cnts[prev + letter] - gram_cnts[letter + post] + gram_cnts[whole_gram]) * math.log(ff_prob) +
+            # not letter | not prev & not post
+            (space - gram_cnts[letter] - (cnt_prev_post - gram_cnts[whole_gram]) - (gram_cnts[prev] - gram_cnts[prev + letter]) - (gram_cnts[post] - gram_cnts[letter + post])) * math.log(1 - ff_prob)
 
         )
-
-        return log_lambda
     
-    elif h1_prob_t == 1:
-        pass # auto-obsorb into word-part (or smoothing?)
+    h_prev_t = gram_cnts[prev + letter] / gram_cnts[prev]
+    h_prev_f = (gram_cnts[letter] - gram_cnts[prev + letter]) / (space - gram_cnts[prev])
+    h_post_t = gram_cnts[letter + post] / gram_cnts[post]
+    h_post_f = (gram_cnts[letter] - gram_cnts[letter + post]) / (space - gram_cnts[post])
+    h_prev_post_t = gram_cnts[whole_gram] / cnt_prev_post
+    h_prev_post_f = (gram_cnts[letter] - gram_cnts[whole_gram]) / (space - cnt_prev_post)
+    h_none_t = (gram_cnts[letter] - gram_cnts[prev + letter] - gram_cnts[letter + post] + gram_cnts[whole_gram]) / (space - gram_cnts[prev] - gram_cnts[post] + cnt_prev_post)
+    h_none_f = (gram_cnts[prev + letter] + gram_cnts[letter + post] - gram_cnts[whole_gram]) / (gram_cnts[prev] + gram_cnts[post] - cnt_prev_post)
 
-    return 0
+    L_h0 = likelihood(h0_prob, h0_prob, h0_prob, h0_prob)
+    L_h_prev_post = likelihood(h_prev_post_t, h_prev_post_f, h_prev_post_f, h_prev_post_f)
+    L_h_prev = likelihood(h_prev_t, h_prev_t, h_prev_f, h_prev_f)
+    L_h_post = likelihood(h_post_t, h_post_f, h_post_t, h_post_f)
+    L_h_none = likelihood(h_none_f, h_none_f, h_none_f, h_none_t)
 
+    return L_h0, L_h_prev_post, L_h_prev, L_h_post, L_h_none
+    
 
-results_prec = dict()
-results_succ = dict()
+word = input("Type word to analyze: ")
+word = " " + word + "."
+theories = []
+for i in range(1, len(word)-1):
+    for j in range(0, i):
+        for k in range(i+2, len(word)+1):
+            L_h0, L_h_prev_post, L_h_prev, L_h_post, L_h_none = likelihoods(word[i], word[j:i], word[i+1:k])
 
-for gram in gram_cnts:
-    for lett in alphabet:
-        if gram + lett in gram_cnts:
-            results_prec[gram + lett] = log_lam(0, gram, lett)
-        if lett + gram in gram_cnts:
-            results_succ[lett + gram] = log_lam(1, gram, lett)
+            theories.append((L_h0-L_h_prev_post, j, k))
+            theories.append((L_h0-L_h_prev, j, i+1))
+            theories.append((L_h0-L_h_post, i, k))
+            theories.append((L_h0-L_h_none, i, i+1))
 
-#json.dump(sorted(results, key=lambda x: x[1], reverse=True), open("collocations/new_gram_collocations.json", "w"))
-#json.dump(sorted(results_backward, key=lambda x: x[1], reverse=True), open("collocations/new_gram_collocations_backward.json", "w"))
+theories = sorted(theories, key=lambda x: x[0], reverse=True)
+seen = set()
+collocs = []
+theoryiter = iter(theories)
+while len(seen) < len(word):
+    try:
+        _, alp, ome = next(theoryiter)
+    except StopIteration:
+        print("it's absolutely nuts that this is happening")
+        break
+    theory = set(range(alp, ome))
+    tem = True
+    for i in range(len(collocs)):
+        if collocs[i].issubset(theory):
+            if not tem:
+                collocs[i] = None
+                continue
+            collocs[i] = theory
+            tem = False
+    if tem:
+        collocs.append(theory)
+    for idx in theory:
+        seen.add(idx)
+    while None in collocs:
+        collocs.remove(None)
 
-json.dump(results_prec, open("collocations/preceding_gram_scores.json", "w"))
-json.dump(results_succ, open("collocations/succeeding_gram_scores.json", "w"))
+for i in range(len(collocs)):
+    if collocs[i] is None:
+        continue
+    for j in range(i+1, len(collocs)):
+        if collocs[j] is None:
+            continue
+        if (collocs[j]-{0,len(word)-1}).issubset(collocs[i]):
+            collocs[j] = None
+        elif (collocs[i]-{0,len(word)-1}).issubset(collocs[j]):
+            collocs[i] = None
+            break
+while None in collocs:
+        collocs.remove(None)
 
-#for i in range(3,7):
-#    json.dump(sorted([r for r in results if len(r[0])==i], key=lambda x: x[1], reverse=True), open(str(i) + "-gram_collocations.json", "w"))"""
+for colloc in [sorted(list(c)) for c in collocs]:
+    print(word[colloc[0]:colloc[-1]+1])
+
+#json.dump(sorted(anss, key=lambda x: max(x[4]), reverse=True), open("collocations/analysis/" + word[1:-1] + ".json", "w"), indent=4)
