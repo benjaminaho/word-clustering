@@ -114,6 +114,9 @@ while word != "stopnow":
                     theories.append((L_h0-L_h_none, i, j))
 
     print(t_gram, t_prev, t_post, t_prev_post)
+    #print(sorted(list(cnts.rec.items()), key=lambda x: x[1]))
+    #print(cnts.rec2)
+    t_gram=t_prev=t_post=t_prev_post = 0
 
     theories = sorted(theories, key=lambda x: x[0], reverse=True)
     seen = set()
@@ -160,4 +163,4 @@ while word != "stopnow":
 
     word = input("Type word to analyze: ")
 
-#json.dump(sorted(anss, key=lambda x: max(x[4]), reverse=True), open("collocations/analysis/" + word[1:-1] + ".json", "w"), indent=4)
+    json.dump(sorted(theories, key=lambda x: x[0], reverse=True), open("collocations/analysis/" + word[1:-1] + ".json", "w"), indent=4)
